@@ -1,0 +1,23 @@
+{
+  "properties": [
+    {
+      "name": "documentation.application.description",
+      "type": "java.lang.String",
+      "description": "Description for application to be used in OpenAPI documentation."
+    },
+    {
+      "name": "authorization.jwt.secret",
+      "type": "java.lang.String",
+      "description": "Secret key used for signing JWT tokens."
+    },
+    {
+      "name": "documentation.application.version",
+      "type": "java.lang.String",
+      "description": "Version of the application to be used in OpenAPI documentation."
+    },
+    {
+      "name": "authorization.jwt.expiration.days",
+      "type": "java.lang.String",
+      "description": "Number of days after which the JWT token expires."
+    }
+  ] }
