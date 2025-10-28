@@ -11,8 +11,8 @@
     <groupId>com.acme.center</groupId>
     <artifactId>platform</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>learning-center-platform</name>
-    <description>learning-center-platform</description>
+    <name>ACME Learning Platform</name>
+    <description>ACME Learning Platform application REST API.</description>
     <url/>
     <licenses>
         <license/>
