@@ -1,0 +1,829 @@
+@startuml
+' Learning Center Platform - class diagram (bounded contexts: iam, learning, profiles, shared)
+' Full nested package grouping; normalized package/class block formatting to satisfy PlantUML parser
+
+skinparam classAttributeIconSize 0
+
+package "com.acme.center.platform.iam" {
+  package "interfaces" {
+    package "rest" {
+      class AuthenticationController {
+        +signIn(signInResource) : ResponseEntity<AuthenticatedUserResource>
+        +signUp(signUpResource) : ResponseEntity<UserResource>
+      }
+      class UsersController {
+        +getAllUsers() : ResponseEntity<List<UserResource>>
+        +getUserById(userId: Long) : ResponseEntity<UserResource>
+      }
+      class RolesController {
+        +getAllRoles() : ResponseEntity<List<RoleResource>>
+      }
+
+      package "resources" {
+        class UserResource {
+          +id: Long
+          +username: String
+          +roles: List<String>
+        }
+        class SignInResource {
+          +username: String
+          +password: String
+        }
+        class SignUpResource {
+          +username: String
+          +password: String
+          +roles: List<String>
+        }
+        class AuthenticatedUserResource {
+          +id: Long
+          +username: String
+          +token: String
+        }
+        class RoleResource {
+          +id: Long
+          +name: String
+        }
+      }
+
+      package "transform" {
+        class SignInCommandFromResourceAssembler {
+          +toCommandFromResource(signInResource: SignInResource): SignInCommand {static}
+        }
+        class SignUpCommandFromResourceAssembler {
+          +toCommandFromResource(resource: SignUpResource): SignUpCommand {static}
+        }
+        class AuthenticatedUserResourceFromEntityAssembler {
+          +toResourceFromEntity(user: User, token: String): AuthenticatedUserResource {static}
+        }
+        class UserResourceFromEntityAssembler {
+          +toResourceFromEntity(user: User): UserResource {static}
+        }
+        class RoleResourceFromEntityAssembler {
+          +toResourceFromEntity(role: Role): RoleResource {static}
+        }
+      }
+    }
+
+    package "acl" {
+      class IamContextFacade {
+        +createUser(username: String, password: String): Long
+        +createUser(username: String, password: String, roleNames: List<String>): Long
+        +fetchUserIdByUsername(username: String): Long
+        +fetchUsernameByUserId(userId: Long): String
+      }
+    }
+  }
+
+  package "application" {
+    package "internal" {
+      package "commandservices" {
+        class UserCommandServiceImpl {
+          -userRepository: UserRepository
+          -hashingService: HashingService
+          -tokenService: TokenService
+          -roleRepository: RoleRepository
+          +handle(SignInCommand) : Optional<Pair<User,String>>
+          +handle(SignUpCommand) : Optional<User>
+        }
+        class RoleCommandServiceImpl
+      }
+
+      package "queryservices" {
+        class UserQueryServiceImpl {
+          -userRepository: UserRepository
+          +handle(GetUserByIdQuery) : Optional<User>
+          +handle(GetAllUsersQuery) : List<User>
+        }
+        class RoleQueryServiceImpl
+      }
+
+      package "outboundservices" {
+        package "hashing" {
+          class HashingService
+        }
+        package "tokens" {
+          class TokenService
+        }
+      }
+
+      package "eventhandlers" {
+        class ApplicationReadyEventHandler
+      }
+    }
+
+    package "acl" {
+      class IamContextFacadeImpl
+    }
+  }
+
+  package "domain" {
+    package "model" {
+      package "aggregates" {
+        class User <<aggregate>> {
+          -id: Long
+          -username: String
+          -password: String
+          -roles: Set<Role>
+          +addRole(role: Role): User
+          +addRoles(roles: List<Role>): User
+        }
+      }
+
+      package "entities" {
+        class Role <<entity>> {
+          -id: Long
+          -name: Roles
+          +getStringName(): String
+          +getDefaultRole(): Role {static}
+          +toRoleFromName(name: String): Role {static}
+          +validateRoleSet(List<Role>): List<Role> {static}
+        }
+      }
+
+      package "commands" {
+        class SignInCommand {
+          +username: String
+          +password: String
+        }
+        class SignUpCommand {
+          +username: String
+          +password: String
+          +roles: List<Role>
+        }
+        class SeedRolesCommand
+      }
+      package "queries" {
+        class GetUserByUsernameQuery {
+          +username: String
+        }
+        class GetUserByIdQuery {
+          +userId: Long
+        }
+        class GetAllUsersQuery
+        class GetAllRolesQuery
+        class GetRoleByNameQuery {
+          +name: String
+        }
+        class GetUserByIdQuery
+        class GetAllUsersQuery
+        class GetAllRolesQuery
+      }
+      package "valueobjects" {
+        class Roles
+      }
+    }
+  }
+
+  package "domain.services" {
+    class UserCommandService {
+      +handle(SignInCommand): Optional<ImmutablePair<User,String>>
+      +handle(SignUpCommand): Optional<User>
+    }
+    class UserQueryService {
+      +handle(GetAllUsersQuery): List<User>
+      +handle(GetUserByIdQuery): Optional<User>
+      +handle(GetUserByUsernameQuery): Optional<User>
+    }
+    class RoleCommandService {
+      +handle(SeedRolesCommand): void
+    }
+    class RoleQueryService {
+      +handle(GetAllRolesQuery): List<Role>
+      +handle(GetRoleByNameQuery): Optional<Role>
+    }
+  }
+com.acme.center.platform.iam.interfaces.rest.AuthenticationController --> com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl : uses
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl --> com.acme.center.platform.iam.infrastructure.persistence.jpa.repositories.UserRepository : saves/reads
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl --> com.acme.center.platform.iam.application.internal.outboundservices.hashing.HashingService : uses
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl --> com.acme.center.platform.iam.application.internal.outboundservices.tokens.TokenService : uses
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl --> com.acme.center.platform.iam.infrastructure.persistence.jpa.repositories.RoleRepository : reads
+com.acme.center.platform.iam.application.internal.commandservices.RoleCommandServiceImpl --> com.acme.center.platform.iam.infrastructure.persistence.jpa.repositories.RoleRepository : saves/reads
+
+com.acme.center.platform.learning.interfaces.rest.CoursesController --> com.acme.center.platform.learning.application.internal.commandservices.CourseCommandServiceImpl : uses
+com.acme.center.platform.learning.interfaces.rest.CoursesController --> com.acme.center.platform.learning.application.internal.queryservices.CourseQueryServiceImpl : uses
+com.acme.center.platform.learning.application.internal.commandservices.CourseCommandServiceImpl --> com.acme.center.platform.learning.infrastructure.persistence.jpa.repositories.CourseRepository : saves/reads
+
+com.acme.center.platform.learning.interfaces.rest.EnrollmentsController --> com.acme.center.platform.learning.application.internal.commandservices.EnrollmentCommandServiceImpl : uses
+com.acme.center.platform.learning.interfaces.rest.EnrollmentsController --> com.acme.center.platform.learning.application.internal.queryservices.EnrollmentQueryServiceImpl : uses
+com.acme.center.platform.learning.application.internal.commandservices.EnrollmentCommandServiceImpl --> com.acme.center.platform.learning.infrastructure.persistence.jpa.repositories.EnrollmentRepository : persists
+com.acme.center.platform.learning.application.internal.commandservices.EnrollmentCommandServiceImpl --> com.acme.center.platform.learning.application.internal.outboundservices.acl.ExternalProfileService : calls
+
+com.acme.center.platform.learning.interfaces.rest.StudentsController --> com.acme.center.platform.learning.application.internal.commandservices.StudentCommandServiceImpl : uses
+com.acme.center.platform.learning.application.internal.commandservices.StudentCommandServiceImpl --> com.acme.center.platform.learning.infrastructure.persistence.jpa.repositories.StudentRepository : saves/reads
+
+com.acme.center.platform.profiles.interfaces.rest.ProfilesController --> com.acme.center.platform.profiles.application.internal.commandservices.ProfileCommandServiceImpl : uses
+com.acme.center.platform.profiles.interfaces.rest.ProfilesController --> com.acme.center.platform.profiles.application.internal.queryservices.ProfileQueryServiceImpl : uses
+com.acme.center.platform.profiles.application.internal.commandservices.ProfileCommandServiceImpl --> com.acme.center.platform.profiles.infrastructure.persistence.jpa.repositories.ProfileRepository : saves/reads
+
+com.acme.center.platform.iam.application.internal.outboundservices.tokens.TokenService ..> com.acme.center.platform.iam.infrastructure.tokens.jwt.TokenServiceImpl : implements
+
+' Implementation relationships
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl ..|> com.acme.center.platform.iam.domain.services.UserCommandService
+com.acme.center.platform.iam.application.internal.queryservices.UserQueryServiceImpl ..|> com.acme.center.platform.iam.domain.services.UserQueryService
+com.acme.center.platform.iam.application.internal.commandservices.RoleCommandServiceImpl ..|> com.acme.center.platform.iam.domain.services.RoleCommandService
+com.acme.center.platform.iam.application.internal.queryservices.RoleQueryServiceImpl ..|> com.acme.center.platform.iam.domain.services.RoleQueryService
+
+com.acme.center.platform.learning.application.internal.commandservices.CourseCommandServiceImpl ..|> com.acme.center.platform.learning.domain.services.CourseCommandService
+com.acme.center.platform.learning.application.internal.queryservices.CourseQueryServiceImpl ..|> com.acme.center.platform.learning.domain.services.CourseQueryService
+com.acme.center.platform.learning.application.internal.commandservices.StudentCommandServiceImpl ..|> com.acme.center.platform.learning.domain.services.StudentCommandService
+com.acme.center.platform.learning.application.internal.queryservices.StudentQueryServiceImpl ..|> com.acme.center.platform.learning.domain.services.StudentQueryService
+com.acme.center.platform.learning.application.internal.commandservices.EnrollmentCommandServiceImpl ..|> com.acme.center.platform.learning.domain.services.EnrollmentCommandService
+com.acme.center.platform.learning.application.internal.queryservices.EnrollmentQueryServiceImpl ..|> com.acme.center.platform.learning.domain.services.EnrollmentQueryService
+
+com.acme.center.platform.profiles.application.internal.commandservices.ProfileCommandServiceImpl ..|> com.acme.center.platform.profiles.domain.services.ProfileCommandService
+com.acme.center.platform.profiles.application.internal.queryservices.ProfileQueryServiceImpl ..|> com.acme.center.platform.profiles.domain.services.ProfileQueryService
+
+com.acme.center.platform.iam.infrastructure.tokens.jwt.TokenServiceImpl ..|> com.acme.center.platform.iam.application.internal.outboundservices.tokens.TokenService
+
+' Add IAM infrastructure declarations (real packages)
+package "com.acme.center.platform.iam" {
+  package "infrastructure" {
+    package "tokens" {
+      package "jwt" {
+        interface BearerTokenService {
+          +getBearerTokenFrom(request: HttpServletRequest): String
+          +generateToken(authentication: Authentication): String
+          +generateToken(username: String): String
+          +getUsernameFromToken(token: String): String
+          +validateToken(token: String): boolean
+        }
+        class TokenServiceImpl {
+          +generateToken(username: String): String
+          +getBearerTokenFrom(request: HttpServletRequest): String
+          +getUsernameFromToken(token: String): String
+          +validateToken(token: String): boolean
+        }
+      }
+    }
+
+    package "hashing" {
+      package "bcrypt" {
+        interface BCryptHashingService
+        class HashingServiceImpl {
+          +encode(rawPassword: CharSequence): String
+          +matches(rawPassword: CharSequence, encodedPassword: String): boolean
+        }
+      }
+    }
+
+    package "authorization" {
+      package "sfs" {
+        class UserDetailsServiceImpl {
+          +loadUserByUsername(username: String): UserDetails
+        }
+        class UserDetailsImpl {
+          +build(user: User): UserDetailsImpl {static}
+        }
+        class UnauthorizedRequestHandlerEntryPoint {
+          +commence(request: HttpServletRequest, response: HttpServletResponse, authEx: AuthenticationException): void
+        }
+      }
+    }
+  }
+}
+
+' Realization relationships for IAM infra (real packages)
+com.acme.center.platform.iam.infrastructure.tokens.jwt.TokenServiceImpl ..|> com.acme.center.platform.iam.infrastructure.tokens.jwt.BearerTokenService
+com.acme.center.platform.iam.infrastructure.tokens.jwt.BearerTokenService ..|> com.acme.center.platform.iam.application.internal.outboundservices.tokens.TokenService
+com.acme.center.platform.iam.infrastructure.hashing.bcrypt.HashingServiceImpl ..|> com.acme.center.platform.iam.infrastructure.hashing.bcrypt.BCryptHashingService
+com.acme.center.platform.iam.infrastructure.hashing.bcrypt.BCryptHashingService ..|> com.acme.center.platform.iam.application.internal.outboundservices.hashing.HashingService
+com.acme.center.platform.iam.infrastructure.authorization.sfs.UserDetailsServiceImpl ..|> org.springframework.security.core.userdetails.UserDetailsService
+com.acme.center.platform.iam.infrastructure.authorization.sfs.UserDetailsImpl ..|> org.springframework.security.core.userdetails.UserDetails
+com.acme.center.platform.iam.infrastructure.authorization.sfs.UnauthorizedRequestHandlerEntryPoint ..|> org.springframework.security.web.AuthenticationEntryPoint
+
+com.acme.center.platform.shared.infrastructure.persistence.jpa.configuration.strategy.SnakeCaseWithPluralizedTablePhysicalNamingStrategy ..|> org.hibernate.boot.model.naming.PhysicalNamingStrategy
+com.acme.center.platform.profiles.application.acl.ProfilesContextFacadeImpl ..|> com.acme.center.platform.profiles.interfaces.acl.ProfilesContextFacade
+
+' Layout tweaks
+left to right direction
+skinparam packageStyle rectangle
+package "com.acme.center.platform.learning" {
+  package "interfaces" {
+    package "rest" {
+      class CoursesController {
+        +createCourse(...) : ResponseEntity<CourseResource>
+        +getCourseById(courseId: Long) : ResponseEntity<CourseResource>
+      }
+      class StudentsController {
+        +createStudent(...) : ResponseEntity<StudentResource>
+        +getStudentByAcmeStudentRecordId(id: String) : ResponseEntity<StudentResource>
+      }
+      class EnrollmentsController {
+        +requestEnrollment(...) : ResponseEntity<EnrollmentResource>
+        +confirmEnrollment(id:Long): ResponseEntity<MessageResource>
+      }
+      class CourseLearningPathController {
+        +addTutorialToCourseLearningPath(courseId: Long, tutorialId: Long) : ResponseEntity<LearningPathItemResource>
+      }
+
+      package "resources" {
+        class CourseResource {
+          +id: Long
+          +title: String
+          +description: String
+        }
+        class CreateCourseResource {
+          +title: String
+          +description: String
+        }
+        class UpdateCourseResource {
+          +title: String
+          +description: String
+        }
+        class StudentResource {
+          +acmeStudentRecordId: String
+          +profileId: Long
+          +totalCompletedCourses: Integer
+          +totalCompletedTutorials: Integer
+        }
+        class CreateStudentResource {
+          +firstName: String
+          +lastName: String
+          +email: String
+          +street: String
+          +number: String
+          +city: String
+          +postalCode: String
+          +country: String
+        }
+        class EnrollmentResource {
+          +enrollmentId: Long
+          +studentRecordId: String
+          +courseId: Long
+          +status: String
+        }
+        class RequestEnrollmentResource {
+          +studentRecordId: String
+          +courseId: Long
+        }
+        class LearningPathItemResource {
+          +learningPathItemId: Long
+          +courseId: Long
+          +tutorialId: Long
+        }
+      }
+
+      package "transform" {
+        class CourseResourceFromEntityAssembler {
+          +toResourceFromEntity(entity: Course): CourseResource {static}
+        }
+        class EnrollmentResourceFromEntityAssembler {
+          +toResourceFromEntity(entity: Enrollment): EnrollmentResource {static}
+        }
+        class StudentResourceFromEntityAssembler {
+          +toResourceFromEntity(entity: Student): StudentResource {static}
+        }
+        class RequestEnrollmentCommandFromResourceAssembler {
+          +toCommandFromResource(resource: RequestEnrollmentResource): RequestEnrollmentCommand {static}
+        }
+        class CreateCourseCommandFromResourceAssembler {
+          +toCommandFromResource(resource: CreateCourseResource): CreateCourseCommand {static}
+        }
+        class UpdateCourseCommandFromResourceAssembler {
+          +toCommandFromResource(courseId: Long, resource: UpdateCourseResource): UpdateCourseCommand {static}
+        }
+        class LearningPathItemResourceFromEntityAssembler {
+          +toResourceFromEntity(entity: LearningPathItem): LearningPathItemResource {static}
+        }
+        class CreateStudentCommandFromResourceAssembler {
+          +toCommandFromResource(resource: CreateStudentResource): CreateStudentCommand {static}
+        }
+      }
+    }
+
+    package "acl" {
+      class LearningContextFacade
+    }
+  }
+
+  package "application" {
+    package "internal" {
+      package "commandservices" {
+        class CourseCommandServiceImpl {
+          +handle(CreateCourseCommand): Long
+        }
+        class StudentCommandServiceImpl {
+          +handle(CreateStudentCommand): AcmeStudentRecordId
+        }
+        package "enrollmentcommandservices" {
+          class EnrollmentCommandServiceImpl {
+            +handle(RequestEnrollmentCommand): Long
+            +handle(ConfirmEnrollmentCommand): Long
+            +handle(RejectEnrollmentCommand): Long
+            +handle(CancelEnrollmentCommand): Long
+            +handle(CompleteTutorialForEnrollmentCommand): Long
+          }
+        }
+      }
+
+      package "queryservices" {
+        class CourseQueryServiceImpl {
+          +handle(GetCourseByIdQuery): Optional<Course>
+          +handle(GetAllCoursesQuery): List<Course>
+        }
+        class EnrollmentQueryServiceImpl {
+          +handle(GetAllEnrollmentsQuery): List<Enrollment>
+        }
+        class StudentQueryServiceImpl {
+          +handle(GetStudentByAcmeStudentRecordIdQuery): Optional<Student>
+        }
+      }
+
+      package "outboundservices" {
+        package "acl" {
+          class ExternalProfileService {
+            +fetchProfileByEmail(email: String): Optional<ProfileId>
+            +createProfile(...): Optional<ProfileId>
+          }
+        }
+      }
+
+      package "eventhandlers" {
+        class TutorialCompletedEventHandler
+      }
+    }
+  }
+
+  package "domain" {
+    package "model" {
+      package "aggregates" {
+        class Course <<aggregate>> {
+          -title: String
+          -description: String
+          -learningPath: LearningPath
+          +updateInformation(title,description): Course
+          +addTutorialToLearningPath(tutorialId): void
+        }
+        class Enrollment <<aggregate>> {
+          -acmeStudentRecordId: AcmeStudentRecordId
+          -course: Course
+          -progressRecord: ProgressRecord
+          -status: EnrollmentStatus
+          +confirm(): void
+          +reject(): void
+          +cancel(): void
+          +completeTutorial(tutorialId): void
++          +isConfirmed(): boolean
++          +isRejected(): boolean
++          +isCancelled(): boolean
++          +getStatus(): String
++          +calculateDaysElapsed(): long
+        }
+      }
+
+      package "entities" {
+        class LearningPathItem
+      }
+
+      package "commands" {
+        class CreateCourseCommand {
+          +title: String
+          +description: String
+        }
+        class UpdateCourseCommand
+        class DeleteCourseCommand
+        class AddTutorialToCourseLearningPathCommand {
+          +courseId: Long
+          +tutorialId: Long
+        }
+        class CreateStudentCommand
+        class RequestEnrollmentCommand
+        class ConfirmEnrollmentCommand
+        class RejectEnrollmentCommand
+        class CancelEnrollmentCommand
+        class CompleteTutorialForEnrollmentCommand
+        class UpdateStudentMetricsOnTutorialCompletedCommand
+      }
+
+      package "queries" {
+        class GetCourseByIdQuery
+        class GetAllCoursesQuery
+        class GetStudentByAcmeStudentRecordIdQuery
+        class GetStudentByProfileIdQuery
+        class GetAllEnrollmentsByAcmeStudentRecordIdQuery
+        class GetAllEnrollmentsQuery
+        class GetAllEnrollmentsByCourseIdQuery
+        class GetEnrollmentByIdQuery
+        class GetEnrollmentByAcmeStudentRecordIdAndCourseIdQuery
+        class ExistsByAcmeStudentRecordIdQuery
+      }
+
+      package "valueobjects" {
+        class ProfileId
+        class AcmeStudentRecordId
+        class TutorialId
+        class StudentPerformanceMetricSet
+        class EnrollmentStatus
+        class LearningPath
+        class ProgressRecord
+      }
+    }
+  }
+
+  package "domain.services" {
+    class CourseCommandService {
+      +handle(CreateCourseCommand): Long
+      +handle(UpdateCourseCommand): Optional<Course>
+      +handle(DeleteCourseCommand): void
+      +handle(AddTutorialToCourseLearningPathCommand): void
+    }
+    class CourseQueryService {
+      +handle(GetCourseByIdQuery): Optional<Course>
+      +handle(GetAllCoursesQuery): List<Course>
+      +handle(GetLearningPathItemByCourseIdAndTutorialIdQuery): Optional<LearningPathItem>
+    }
+    class StudentCommandService {
+      +handle(CreateStudentCommand): AcmeStudentRecordId
+      +handle(UpdateStudentMetricsOnTutorialCompletedCommand): AcmeStudentRecordId
+    }
+    class StudentQueryService {
+      +handle(GetStudentByProfileIdQuery): Optional<Student>
+      +handle(GetStudentByAcmeStudentRecordIdQuery): Optional<Student>
+      +handle(ExistsByAcmeStudentRecordIdQuery): boolean
+    }
+    class EnrollmentCommandService {
+      +handle(RequestEnrollmentCommand): Long
+      +handle(ConfirmEnrollmentCommand): Long
+      +handle(RejectEnrollmentCommand): Long
+      +handle(CancelEnrollmentCommand): Long
+      +handle(CompleteTutorialForEnrollmentCommand): Long
+    }
+    class EnrollmentQueryService {
+      +handle(GetAllEnrollmentsByAcmeStudentRecordIdQuery): List<Enrollment>
+      +handle(GetEnrollmentByIdQuery): Optional<Enrollment>
+      +handle(GetAllEnrollmentsQuery): List<Enrollment>
+      +handle(GetAllEnrollmentsByCourseIdQuery): List<Enrollment>
+      +handle(GetEnrollmentByAcmeStudentRecordIdAndCourseIdQuery): Optional<Enrollment>
+    }
+  }
+package "com.acme.center.platform.profiles" {
+  package "interfaces" {
+    package "rest" {
+      class ProfilesController {
+        +createProfile(createProfileResource): ResponseEntity<ProfileResource>
+        +getProfileById(profileId: Long): ResponseEntity<ProfileResource>
+      }
+
+      package "resources" {
+        class ProfileResource {
+          +id: Long
+          +fullName: String
+          +email: String
+          +streetAddress: String
+        }
+        class CreateProfileResource {
+          +firstName: String
+          +lastName: String
+          +email: String
+          +street: String
+          +number: String
+          +city: String
+          +postalCode: String
+          +country: String
+        }
+      }
+
+      package "transform" {
+        class ProfileResourceFromEntityAssembler {
+          +toResourceFromEntity(entity: Profile): ProfileResource {static}
+        }
+        class CreateProfileCommandFromResourceAssembler {
+          +toCommandFromResource(resource: CreateProfileResource): CreateProfileCommand {static}
+        }
+      }
+    }
+
+    package "acl" {
+      class ProfilesContextFacade {
+        +createProfile(firstName: String, lastName: String, email: String, street: String, number: String, city: String, postalCode: String, country: String): Long
+        +fetchProfileIdByEmail(email: String): Long
+      }
+      class ProfilesContextFacadeImpl {
+        -profileCommandService: ProfileCommandService
+        -profileQueryService: ProfileQueryService
+        +createProfile(firstName: String, lastName: String, email: String, street: String, number: String, city: String, postalCode: String, country: String): Long
+        +fetchProfileIdByEmail(email: String): Long
+      }
+    }
+  }
+
+  package "application" {
+    package "internal" {
+      package "commandservices" {
+        class ProfileCommandServiceImpl {
+          +handle(CreateProfileCommand): Optional<Profile>
+        }
+      }
+
+      package "queryservices" {
+        class ProfileQueryServiceImpl {
+          +handle(GetProfileByIdQuery) : Optional<Profile>
+          +handle(GetAllProfilesQuery) : List<Profile>
+        }
+      }
+    }
+  }
+
+  package "domain" {
+    package "model" {
+      package "aggregates" {
+        class Profile <<aggregate>> {
+          -name: PersonName
+          -emailAddress: EmailAddress
+          -streetAddress: StreetAddress
+          +getFullName(): String
+          +getEmailAddress(): String
+          +getStreetAddress(): String
+          +updateName(firstName,lastName): void
+          +updateEmailAddress(email): void
+        }
+      }
+
+      package "commands" {
+        class CreateProfileCommand
+      }
+      package "queries" {
+        class GetProfileByIdQuery
+      }
+      package "valueobjects" {
+        class PersonName
+        class EmailAddress
+        class StreetAddress
+      }
+    }
+  }
+
+  package "domain.services" {
+    class ProfileCommandService {
+      +handle(CreateProfileCommand): Optional<Profile>
+    }
+    class ProfileQueryService {
+      +handle(GetProfileByIdQuery): Optional<Profile>
+      +handle(GetProfileByEmailQuery): Optional<Profile>
+      +handle(GetAllProfilesQuery): List<Profile>
+    }
+  }
+package "com.acme.center.platform.shared" {
+  package "interfaces" {
+    package "rest" {
+      class MessageResource {
+        +message: String
+      }
+    }
+  }
+  package "domain" {
+    package "model" {
+      class AuditableAbstractAggregateRoot
+    }
+  }
+}
+
+' Cross-context relations
+com.acme.center.platform.iam.interfaces.rest.AuthenticationController --> com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl : uses
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl --> com.acme.center.platform.iam.infrastructure.persistence.jpa.repositories.UserRepository : saves/reads
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl --> com.acme.center.platform.iam.application.internal.outboundservices.hashing.HashingService : uses
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl --> com.acme.center.platform.iam.application.internal.outboundservices.tokens.TokenService : uses
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl --> com.acme.center.platform.iam.infrastructure.persistence.jpa.repositories.RoleRepository : reads
+com.acme.center.platform.iam.application.internal.commandservices.RoleCommandServiceImpl --> com.acme.center.platform.iam.infrastructure.persistence.jpa.repositories.RoleRepository : saves/reads
+
+com.acme.center.platform.learning.interfaces.rest.CoursesController --> com.acme.center.platform.learning.application.internal.commandservices.CourseCommandServiceImpl : uses
+com.acme.center.platform.learning.interfaces.rest.CoursesController --> com.acme.center.platform.learning.application.internal.queryservices.CourseQueryServiceImpl : uses
+com.acme.center.platform.learning.application.internal.commandservices.CourseCommandServiceImpl --> com.acme.center.platform.learning.infrastructure.persistence.jpa.repositories.CourseRepository : saves/reads
+
+com.acme.center.platform.learning.interfaces.rest.EnrollmentsController --> com.acme.center.platform.learning.application.internal.commandservices.EnrollmentCommandServiceImpl : uses
+com.acme.center.platform.learning.interfaces.rest.EnrollmentsController --> com.acme.center.platform.learning.application.internal.queryservices.EnrollmentQueryServiceImpl : uses
+com.acme.center.platform.learning.application.internal.commandservices.EnrollmentCommandServiceImpl --> com.acme.center.platform.learning.infrastructure.persistence.jpa.repositories.EnrollmentRepository : persists
+com.acme.center.platform.learning.application.internal.commandservices.EnrollmentCommandServiceImpl --> com.acme.center.platform.learning.application.internal.outboundservices.acl.ExternalProfileService : calls
+
+com.acme.center.platform.learning.interfaces.rest.StudentsController --> com.acme.center.platform.learning.application.internal.commandservices.StudentCommandServiceImpl : uses
+com.acme.center.platform.learning.application.internal.commandservices.StudentCommandServiceImpl --> com.acme.center.platform.learning.infrastructure.persistence.jpa.repositories.StudentRepository : saves/reads
+
+com.acme.center.platform.profiles.interfaces.rest.ProfilesController --> com.acme.center.platform.profiles.application.internal.commandservices.ProfileCommandServiceImpl : uses
+com.acme.center.platform.profiles.interfaces.rest.ProfilesController --> com.acme.center.platform.profiles.application.internal.queryservices.ProfileQueryServiceImpl : uses
+com.acme.center.platform.profiles.application.internal.commandservices.ProfileCommandServiceImpl --> com.acme.center.platform.profiles.infrastructure.persistence.jpa.repositories.ProfileRepository : saves/reads
+
+com.acme.center.platform.iam.application.internal.outboundservices.tokens.TokenService ..> com.acme.center.platform.iam.infrastructure.tokens.jwt.TokenServiceImpl : implements
+
+' Implementation relationships
+com.acme.center.platform.iam.application.internal.commandservices.UserCommandServiceImpl ..|> com.acme.center.platform.iam.domain.services.UserCommandService
+com.acme.center.platform.iam.application.internal.queryservices.UserQueryServiceImpl ..|> com.acme.center.platform.iam.domain.services.UserQueryService
+com.acme.center.platform.iam.application.internal.commandservices.RoleCommandServiceImpl ..|> com.acme.center.platform.iam.domain.services.RoleCommandService
+com.acme.center.platform.iam.application.internal.queryservices.RoleQueryServiceImpl ..|> com.acme.center.platform.iam.domain.services.RoleQueryService
+
+com.acme.center.platform.learning.application.internal.commandservices.CourseCommandServiceImpl ..|> com.acme.center.platform.learning.domain.services.CourseCommandService
+com.acme.center.platform.learning.application.internal.queryservices.CourseQueryServiceImpl ..|> com.acme.center.platform.learning.domain.services.CourseQueryService
+com.acme.center.platform.learning.application.internal.commandservices.StudentCommandServiceImpl ..|> com.acme.center.platform.learning.domain.services.StudentCommandService
+com.acme.center.platform.learning.application.internal.queryservices.StudentQueryServiceImpl ..|> com.acme.center.platform.learning.domain.services.StudentQueryService
+com.acme.center.platform.learning.application.internal.commandservices.EnrollmentCommandServiceImpl ..|> com.acme.center.platform.learning.domain.services.EnrollmentCommandService
+com.acme.center.platform.learning.application.internal.queryservices.EnrollmentQueryServiceImpl ..|> com.acme.center.platform.learning.domain.services.EnrollmentQueryService
+
+com.acme.center.platform.profiles.application.internal.commandservices.ProfileCommandServiceImpl ..|> com.acme.center.platform.profiles.domain.services.ProfileCommandService
+com.acme.center.platform.profiles.application.internal.queryservices.ProfileQueryServiceImpl ..|> com.acme.center.platform.profiles.domain.services.ProfileQueryService
+
+com.acme.center.platform.iam.infrastructure.tokens.jwt.TokenServiceImpl ..|> com.acme.center.platform.iam.application.internal.outboundservices.tokens.TokenService
+
+' Additional concrete realizations
+com.acme.center.platform.iam.infrastructure.hashing.bcrypt.HashingServiceImpl ..|> com.acme.center.platform.iam.infrastructure.hashing.bcrypt.BCryptHashingService
+com.acme.center.platform.iam.infrastructure.hashing.bcrypt.BCryptHashingService ..|> com.acme.center.platform.iam.application.internal.outboundservices.hashing.HashingService
+com.acme.center.platform.iam.infrastructure.authorization.sfs.services.UserDetailsServiceImpl ..|> org.springframework.security.core.userdetails.UserDetailsService
+com.acme.center.platform.iam.infrastructure.authorization.sfs.model.UserDetailsImpl ..|> org.springframework.security.core.userdetails.UserDetails
+com.acme.center.platform.iam.infrastructure.authorization.sfs.pipeline.UnauthorizedRequestHandlerEntryPoint ..|> org.springframework.security.web.AuthenticationEntryPoint
+com.acme.center.platform.shared.infrastructure.persistence.jpa.configuration.strategy.SnakeCaseWithPluralizedTablePhysicalNamingStrategy ..|> org.hibernate.boot.model.naming.PhysicalNamingStrategy
+com.acme.center.platform.profiles.application.acl.ProfilesContextFacadeImpl ..|> com.acme.center.platform.profiles.interfaces.acl.ProfilesContextFacade
+
+' Layout tweaks
+left to right direction
+skinparam packageStyle rectangle
+' Additional small infra & Spring implementations (declared for clarity)
+package "infrastructure_extras" {
+  package "tokens" {
+    package "jwt" {
+      interface BearerTokenService {
+        +getBearerTokenFrom(request: HttpServletRequest): String
+        +generateToken(authentication: Authentication): String
+        +generateToken(username: String): String
+        +getUsernameFromToken(token: String): String
+        +validateToken(token: String): boolean
+      }
+      class TokenServiceImpl {
+        +generateToken(username: String): String
+        +getBearerTokenFrom(request: HttpServletRequest): String
+        +getUsernameFromToken(token: String): String
+        +validateToken(token: String): boolean
+      }
+    }
+  }
+
+  package "hashing" {
+    package "bcrypt" {
+      interface BCryptHashingService
+      class HashingServiceImpl {
+        +encode(rawPassword: CharSequence): String
+        +matches(rawPassword: CharSequence, encodedPassword: String): boolean
+      }
+    }
+  }
+
+  package "security" {
+    class UserDetailsServiceImpl {
+      +loadUserByUsername(username: String): UserDetails
+    }
+    class UserDetailsImpl {
+      +build(user: User): UserDetailsImpl {static}
+    }
+    class UnauthorizedRequestHandlerEntryPoint {
+      +commence(request: HttpServletRequest, response: HttpServletResponse, authEx: AuthenticationException): void
+    }
+  }
+
+  class SnakeCaseWithPluralizedTablePhysicalNamingStrategy {
+    +toPhysicalTableName(identifier: Identifier, jdbcEnvironment: JdbcEnvironment): Identifier
+  }
+}
+
+' Realizations for the extras
+com.acme.center.platform.infrastructure_extras.tokens.jwt.TokenServiceImpl ..|> com.acme.center.platform.infrastructure_extras.tokens.jwt.BearerTokenService
+com.acme.center.platform.infrastructure_extras.tokens.jwt.BearerTokenService ..|> com.acme.center.platform.iam.application.internal.outboundservices.tokens.TokenService
+com.acme.center.platform.infrastructure_extras.hashing.bcrypt.HashingServiceImpl ..|> com.acme.center.platform.infrastructure_extras.hashing.bcrypt.BCryptHashingService
+com.acme.center.platform.infrastructure_extras.hashing.bcrypt.BCryptHashingService ..|> com.acme.center.platform.iam.application.internal.outboundservices.hashing.HashingService
+
+com.acme.center.platform.infrastructure_extras.security.UserDetailsServiceImpl ..|> org.springframework.security.core.userdetails.UserDetailsService
+com.acme.center.platform.infrastructure_extras.security.UserDetailsImpl ..|> org.springframework.security.core.userdetails.UserDetails
+com.acme.center.platform.infrastructure_extras.security.UnauthorizedRequestHandlerEntryPoint ..|> org.springframework.security.web.AuthenticationEntryPoint
+
+com.acme.center.platform.infrastructure_extras.SnakeCaseWithPluralizedTablePhysicalNamingStrategy ..|> org.hibernate.boot.model.naming.PhysicalNamingStrategy
+' Add persistence repositories and auth filter/builder to IAM infrastructure
+package "com.acme.center.platform.iam" {
+  package "infrastructure" {
+    package "persistence" {
+      package "jpa" {
+        package "repositories" {
+          interface UserRepository {
+            +findByUsername(username: String): Optional<User>
+            +existsByUsername(username: String): boolean
+          }
+          interface RoleRepository {
+            +findByName(name: Roles): Optional<Role>
+            +existsByName(name: Roles): boolean
+          }
+        }
+      }
+    }
+
+    package "authorization" {
+      package "sfs" {
+        class BearerAuthorizationRequestFilter {
+          +BearerAuthorizationRequestFilter(tokenService: BearerTokenService, userDetailsService: UserDetailsService)
+          +doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain): void
+        }
+        class UsernamePasswordAuthenticationTokenBuilder {
+          +build(principal: UserDetails, request: HttpServletRequest): UsernamePasswordAuthenticationToken {static}
+        }
+      }
+    }
+  }
+}
+
+' Inheritances / extensions
+com.acme.center.platform.iam.infrastructure.authorization.sfs.BearerAuthorizationRequestFilter --|> org.springframework.web.filter.OncePerRequestFilter
+@enduml
