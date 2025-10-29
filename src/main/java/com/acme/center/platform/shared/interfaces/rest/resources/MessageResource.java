@@ -1,4 +1,4 @@
-package com.acme.center.platform.interfaces.rest.resources;
+package com.acme.center.platform.shared.interfaces.rest.resources;
 
 /**
  * Simple immutable resource used to return textual messages from REST endpoints.
