@@ -26,7 +26,7 @@ public class Student extends AuditableAbstractAggregateRoot<Student> {
     @Getter
     @Embedded
     @Column(name = "acme_student_id")
-    private AcmeStudentRecordId acmeStudentRecordId;
+    private final AcmeStudentRecordId acmeStudentRecordId;
 
     @Embedded
     private ProfileId profileId;
