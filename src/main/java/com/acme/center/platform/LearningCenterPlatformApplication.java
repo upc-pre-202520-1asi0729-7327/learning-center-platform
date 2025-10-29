@@ -2,10 +2,12 @@ package com.acme.center.platform;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 /**
  * Entry point for the ACME Learning Center Platform Spring Boot application.
  */
+@EnableJpaAuditing
 @SpringBootApplication
 public class LearningCenterPlatformApplication {
 
