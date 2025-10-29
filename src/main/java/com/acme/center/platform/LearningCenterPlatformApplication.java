@@ -15,7 +15,7 @@ public class LearningCenterPlatformApplication {
      * Main method used by the JVM to start the application. Made public so
      * tooling and the Spring Boot repackage goal can reliably detect it.
      */
-    public static void main(String[] args) {
+    static void main(String[] args) {
         SpringApplication.run(LearningCenterPlatformApplication.class, args);
     }
 
