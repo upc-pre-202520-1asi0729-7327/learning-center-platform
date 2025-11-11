@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -56,17 +57,17 @@ public class EnrollmentsController {
             @ApiResponse(responseCode = "201", description = "Enrollment requested successfully"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "404", description = "Enrollment not found")})
-    public ResponseEntity<EnrollmentResource> requestEnrollment(@RequestBody RequestEnrollmentResource resource) {
-        var requestEnrollmentCommand = RequestEnrollmentCommandFromResourceAssembler.toCommandFromResource(resource);
-        var enrollmentId = enrollmentCommandService.handle(requestEnrollmentCommand);
-        if (enrollmentId == null || enrollmentId.equals(0L)) return ResponseEntity.badRequest().build();
-        var getEnrollmentByAcmeStudentRecordIdAndCourseIdQuery = new GetEnrollmentByAcmeStudentRecordIdAndCourseIdQuery(
-                requestEnrollmentCommand.studentRecordId(), requestEnrollmentCommand.courseId());
-        var enrollment = enrollmentQueryService.handle(getEnrollmentByAcmeStudentRecordIdAndCourseIdQuery);
-        if (enrollment.isEmpty()) return ResponseEntity.notFound().build();
-        var requestedEnrollment = enrollment.get();
-        var enrollmentResource = EnrollmentResourceFromEntityAssembler.toResourceFromEntity(requestedEnrollment);
-        return ResponseEntity.ok(enrollmentResource);
+    public ResponseEntity<EnrollmentResource> requestEnrollment(@Valid @RequestBody RequestEnrollmentResource resource) {
+            var requestEnrollmentCommand = RequestEnrollmentCommandFromResourceAssembler.toCommandFromResource(resource);
+            var enrollmentId = enrollmentCommandService.handle(requestEnrollmentCommand);
+            if (enrollmentId == null || enrollmentId.equals(0L)) return ResponseEntity.badRequest().build();
+            var getEnrollmentByAcmeStudentRecordIdAndCourseIdQuery = new GetEnrollmentByAcmeStudentRecordIdAndCourseIdQuery(
+                    requestEnrollmentCommand.studentRecordId(), requestEnrollmentCommand.courseId());
+            var enrollment = enrollmentQueryService.handle(getEnrollmentByAcmeStudentRecordIdAndCourseIdQuery);
+            if (enrollment.isEmpty()) return ResponseEntity.notFound().build();
+            var requestedEnrollment = enrollment.get();
+            var enrollmentResource = EnrollmentResourceFromEntityAssembler.toResourceFromEntity(requestedEnrollment);
+            return ResponseEntity.ok(enrollmentResource);
     }
 
     /**
@@ -120,7 +121,7 @@ public class EnrollmentsController {
     public ResponseEntity<MessageResource> cancelEnrollment(@PathVariable Long enrollmentId) {
         var cancelEnrollmentCommand = new CancelEnrollmentCommand(enrollmentId);
         enrollmentCommandService.handle(cancelEnrollmentCommand);
-        return ResponseEntity.ok(new MessageResource("Cancelled Enrollment ID: "+ enrollmentId));
+        return ResponseEntity.ok(new MessageResource("Cancelled Enrollment ID: " + enrollmentId));
     }
 
     /**
