@@ -4,7 +4,8 @@ import jakarta.persistence.Embeddable;
 import jakarta.validation.constraints.Email;
 
 /**
- * EmailAddress Value Object
+ * Value object representing an email address.
+ * @param address the email address string
  */
 @Embeddable
 public record EmailAddress(@Email String address) {

@@ -1,7 +1,12 @@
 package com.acme.center.platform.profiles.domain.model.valueobjects;
 
 /**
- * StreetAddress Value Object
+ * Value object representing a street address.
+ * @param street the street name
+ * @param number the street number
+ * @param city the city
+ * @param postalCode the postal code
+ * @param country the country
  */
 public record StreetAddress(
         String street,
