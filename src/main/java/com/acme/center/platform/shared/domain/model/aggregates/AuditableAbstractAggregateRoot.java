@@ -9,6 +9,13 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
+/**
+ * Abstract base class for auditable aggregate roots.
+ * Provides common auditing fields like ID, createdAt, and updatedAt.
+ * Extends AbstractAggregateRoot to support domain events.
+ *
+ * @param <T> the type of the aggregate root
+ */
 @Getter
 @EntityListeners(AuditingEntityListener.class)
 @MappedSuperclass
